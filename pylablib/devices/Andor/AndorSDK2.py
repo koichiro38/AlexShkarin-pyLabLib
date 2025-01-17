@@ -15,6 +15,7 @@ import numpy as np
 import collections
 import functools
 import threading
+import ctypes
 
 
 
@@ -530,6 +531,112 @@ class AndorSDK2Camera(camera.IBinROICamera, camera.IExposureCamera):
         gain=int(gain)
         if (advanced is not None) and not self._check_option("set",AC_SETFUNC.AC_SETFUNCTION_EMADVANCED): return
         lib.set_EMCCD_gain(gain,advanced)
+
+    # added by KM 2024-11-22
+    def get_MCP_gain(self):
+        """
+        Get current MCP gain.
+        """
+        return lib.GetMCPGain()
+    
+    def set_fastkineticsEx(self, exposedRows, seriesLength, time, mode, hbin, vbin, offset):
+
+        """
+        Description 
+
+        This function is the same as SetFastKinetics with the addition of an Offset parameter, 
+        which will inform the SDK of the first row to be used. 
+
+        Parameters 
+
+        int exposedRows: sub-area height in rows. 
+        int seriesLength: number in series. 
+        float time: exposure time in seconds. 
+        int mode: binning mode (0: FVB , 4: Image).  
+        int hbin: horizontal binning. 
+        int vbin: vertical binning (only used when in image mode). 
+        Int offset: offset of first row to be used in Fast Kinetics from the bottom of the CCD. 
+        """
+        lib.SetFastKineticsEx(exposedRows, seriesLength, time, mode, hbin, vbin, offset)
+        self.set_roi(0, None, 0, exposedRows*seriesLength, hbin, vbin)
+
+    def get_NumberFKVShiftSpeeds(self):
+        """
+        Return the number of vertical shift speeds available in Fast Kinetics mode. 
+        int: number of vertical shift speeds available. 
+        """
+        return lib.GetNumberFKVShiftSpeeds()
+    
+    def get_FKVShiftSpeedF(self, index):
+        """
+        Returns the vertical shift speed in Fast Kinetics mode. 
+        float: vertical shift speed in microseconds. 
+        """
+        return lib.GetFKVShiftSpeedF(index)
+    
+    def set_FKVShiftSpeed(self, index):
+        """
+        Sets the vertical shift speed in Fast Kinetics mode. 
+
+        Parameters 
+        int index: vertical shift speed index. 
+        """
+        lib.SetFKVShiftSpeed(index)
+
+    def get_acquired_data(self):
+        dim=self._get_data_dimensions_rc()
+        dt=np.dtype(self._default_image_dtype)
+        get_method=lib.GetAcquiredData16 if dt.itemsize<=2 else lib.GetAcquiredData
+        data=get_method(dim[0]*dim[1])
+        return data
+
+    def _set_acquisition_mode(self, mode):
+        if mode=="single":
+            lib.SetAcquisitionMode(1)
+        elif mode=="accum":
+            lib.SetAcquisitionMode(2)
+        elif mode=="kinetic":
+            lib.SetAcquisitionMode(3)
+        elif mode=="fast_kinetic":
+            lib.SetAcquisitionMode(4)
+        elif mode=="run_till_abort":
+            lib.SetAcquisitionMode(5)
+        else:
+            raise ValueError("unknown acquisition mode: {}".format(mode))
+
+    def get_MCP_gain_range(self):
+        """
+        Get MCP gain range.
+        Return tuple ``(min_gain, max_gain)``.
+        """
+        return lib.GetMCPGainRange()
+    
+    def set_MCP_gain(self, gain):
+        """
+        Set MCP gain.
+        """
+        lib.SetMCPGain(gain)
+
+    def get_gate_mode(self):
+        """
+        Get current gate mode.
+        Return ``mode``.
+        """
+        return lib.GetGateMode()
+    
+    def set_gate_mode(self, mode):
+        """
+        Set gate mode.
+
+        Valid values: 0 Fire ANDed with the Gate input.
+                      1 Gating controlled from Fire pulse only.
+                      2 Gating controlled from SMB Gate input only.
+                      3 Gating ON continuously.
+                      4 Gating OFF continuously.
+                      5 Gate using DDG
+
+        """
+        lib.SetGateMode(mode)
 
     def init_amp_mode(self, mode=None):
         """
