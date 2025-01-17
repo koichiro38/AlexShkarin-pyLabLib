@@ -333,7 +333,8 @@ def buffprep(size_arg_pos, dtype):
     """
     el_size=data_format.DataFormat.from_desc(dtype).size
     def prep(*args, **kwargs):  # pylint: disable=unused-argument
-        n=args[size_arg_pos]
+        # n=args[size_arg_pos] # changed by KM ,cont mode
+        n=kwargs["size"]  # changed by KM ,fastkinetics mode
         return ctypes.create_string_buffer(n*el_size)
     return prep
 def buffconv(size_arg_pos, dtype):
@@ -345,7 +346,8 @@ def buffconv(size_arg_pos, dtype):
     """
     dformat=data_format.DataFormat.from_desc(dtype)
     def conv(buff, *args, **kwargs):  # pylint: disable=unused-argument
-        n=args[size_arg_pos]
+        # n=args[size_arg_pos] # changed by KM, cont mode
+        n=args[1]["size"]  # changed by KM, fastkinetics mode
         data=ctypes.string_at(buff,n*dformat.size)
         return np.require(np.frombuffer(data,dtype=dformat.to_desc("numpy")),requirements="W")
     return conv
